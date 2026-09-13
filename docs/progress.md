@@ -8,8 +8,8 @@
 
 | 阶段 | 状态 | 验证 | 提交与推送 |
 | --- | --- | --- | --- |
-| 初始化 | 已完成 | .NET 10 构建通过，零警告零错误 | `56c0911`；push 失败 |
-| 扫描、清单与重复检测 | 已实现 | junction/循环、硬链接、稀疏/长路径、清单逃逸均实测 | `aa48cda`；push 失败 |
+| 初始化 | 已完成 | .NET 10 构建通过，零警告零错误 | `56c0911`；首次 push 超时，后随 `efabf2e` 成功推送 |
+| 扫描、清单与重复检测 | 已实现 | junction/循环、硬链接、稀疏/长路径、清单逃逸均实测 | `aa48cda`；首次 push 超时，后随 `efabf2e` 成功推送 |
 | 安全清理与恢复 | 已完成 | Release Cleanup 测试 25 项通过；跨进程、跨卷、崩溃、冲突、容量和 ADS 场景覆盖 | 待提交 |
 | CLI 与 Web | 已完成 | Release 全套 89 passed / 1 skipped；CLI/Web 测试和 Chromium 流程通过 | `b1f11cb`；已推送 |
 | 故障、并发、安全与性能 | 已完成 | Ctrl+C 脚本通过；small/large 基准已记录；安全文档和恢复前缀核验完成 | `b1f11cb`；已推送 |
@@ -26,8 +26,8 @@
 
 | 提交 | 分支 | 推送结果 |
 | --- | --- | --- |
-| `56c0911` build(solution): initialize shared .NET 10 projects | `codex/fileguard-implementation` | 未推送。`git push -u origin codex/fileguard-implementation` 返回：无法连接 github.com:443（21 秒超时）。本地提交保留，继续实现。 |
-| `aa48cda` feat(core): add bounded scans and verifiable SHA-256 manifests | `codex/fileguard-implementation` | 未推送。相同 push 命令返回 github.com:443 连接失败（21 秒超时）。 |
+| `56c0911` build(solution): initialize shared .NET 10 projects | `codex/fileguard-implementation` | 首次独立 push 因 github.com:443 连接超时失败；后随 `efabf2e` 的成功 push 作为祖先提交到达远程。 |
+| `aa48cda` feat(core): add bounded scans and verifiable SHA-256 manifests | `codex/fileguard-implementation` | 首次独立 push 因 github.com:443 连接超时失败；后随 `efabf2e` 的成功 push 作为祖先提交到达远程。 |
 
 | `efabf2e` feat(quarantine): add verified isolation and crash recovery | `codex/fileguard-implementation` | 已成功推送到 `origin/codex/fileguard-implementation`。 |
 
