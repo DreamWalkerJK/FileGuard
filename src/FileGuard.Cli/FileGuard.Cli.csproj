@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>fileguard</AssemblyName></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../FileGuard.Core/FileGuard.Core.csproj" /></ItemGroup>
+</Project>

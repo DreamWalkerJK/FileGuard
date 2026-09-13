@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FileGuard.Cli/FileGuard.Cli.csproj" />
+    <Project Path="src/FileGuard.Core/FileGuard.Core.csproj" />
+    <Project Path="src/FileGuard.Web/FileGuard.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FileGuard.Tests/FileGuard.Tests.csproj" />
+  </Folder>
+</Solution>

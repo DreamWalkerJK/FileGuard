@@ -55,3 +55,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# FileGuard private state and generated fixtures
+.test-data/
+.local/
+*.db
+*.db-shm
+*.db-wal
+*.lock
+*.user
