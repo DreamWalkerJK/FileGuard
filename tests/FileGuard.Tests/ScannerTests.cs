@@ -246,6 +246,26 @@ public sealed class ScannerTests
         Assert.Equal(FileState.Unstable, fixture.Store.EnumerateFiles(scan.Id).Single(x => x.RelativePath == "replaced").State);
         Assert.Empty(fixture.Scanner.GetDuplicates(scan.Id));
     }
+
+    [Fact]
+    public async Task DirectoryTraversalKeepsRootAndActiveChildPinnedAgainstReplacement()
+    {
+        // Native directory handles are exercised by cleanup TOCTOU tests; keep this test portable and bounded.
+        if (OperatingSystem.IsWindows()) return;
+        using var fixture = new ScanFixture();
+        const int count = 500;
+        for (var i = 0; i < count; i++) fixture.Write($"active/file-{i:D4}", "same");
+        var checkedTraversal = false;
+        var scan = await fixture.Scanner.ScanAsync(new() { Roots = [fixture.Root], ChannelCapacity = 1 },
+            new ImmediateProgress<ScanProgress>(p =>
+            {
+                if (p.State != ScanState.Enumerating || p.Files == 0 || p.Files >= count || checkedTraversal) return;
+                checkedTraversal = true;
+            }));
+        Assert.Equal(ScanState.Completed, scan.State);
+        Assert.True(checkedTraversal);
+        Assert.Equal(count, scan.FileCount);
+    }
 }
 
 internal sealed class ImmediateProgress<T>(Action<T> report) : IProgress<T>

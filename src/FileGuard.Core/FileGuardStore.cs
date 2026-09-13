@@ -18,12 +18,15 @@ public sealed class FileGuardStore
         Directory.CreateDirectory(DataDirectory);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+        var version = Convert.ToInt32(command.ExecuteScalar());
+        if (version > 1) throw new GuardException("数据库版本高于当前程序支持版本，请升级程序。数据库未修改。");
         command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;";
         command.ExecuteNonQuery();
         using var transaction = connection.BeginTransaction();
         command.Transaction = transaction;
         command.CommandText = "PRAGMA user_version";
-        var version = Convert.ToInt32(command.ExecuteScalar());
+        version = Convert.ToInt32(command.ExecuteScalar());
         if (version > 1) throw new GuardException("数据库版本高于当前程序支持版本，请升级程序。数据库未修改。");
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS records(kind TEXT NOT NULL,id TEXT NOT NULL,json TEXT NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(kind,id));

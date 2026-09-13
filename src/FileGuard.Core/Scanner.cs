@@ -100,7 +100,7 @@ public sealed class Scanner(FileGuardStore store, GuardSettings settings)
                                 scan.TotalBytes += record.Size;
                                 if (IsError(record.State)) scan.ErrorCount++;
                             }
-                            Report();
+                            Report(scan.FileCount == 1);
                         }
                     }
                     catch { stage.Cancel(); throw; }
@@ -252,17 +252,36 @@ public sealed class Scanner(FileGuardStore store, GuardSettings settings)
 
     private async Task EnumerateRootAsync(string scanId, string root, ScanMatcher matcher, ChannelWriter<FileRecord> writer, CancellationToken ct)
     {
-        var frames = new Stack<(string Path, IEnumerator<string> Entries, bool Sensitive)>();
+        var frames = new Stack<(string Path, IEnumerator<string> Entries, bool Sensitive, IDisposable? Guard)>();
         async Task AddDirectory(string directory)
         {
+            IDisposable? guard = null;
             try
             {
                 PathSafety.Validate(directory, root);
-                var sensitive = !OperatingSystem.IsWindows() || PathSafety.IsCaseSensitiveDirectory(directory);
-                frames.Push((directory, Directory.EnumerateFileSystemEntries(directory).GetEnumerator(), sensitive));
+                var sensitive = true;
+                if (OperatingSystem.IsWindows())
+                {
+                    if (frames.Count == 0)
+                    {
+                        guard = new DirectoryGuards(directory, mutation: false);
+                        sensitive = PathSafety.IsCaseSensitiveDirectory(directory);
+                    }
+                    else
+                    {
+                        // Parent frames already pin the entire ancestor chain; keep one additional leaf handle.
+                        var handle = NativeFiles.OpenDirectory(directory);
+                        guard = handle;
+                        NativeFiles.ValidateHandle(handle, directory, directory: true);
+                        sensitive = NativeFiles.IsCaseSensitive(handle);
+                    }
+                }
+                frames.Push((directory, Directory.EnumerateFileSystemEntries(directory).GetEnumerator(), sensitive, guard));
+                guard = null; // ownership belongs to the frame until its enumerator is disposed
             }
             catch (Exception ex) when (IsFileException(ex))
             {
+                guard?.Dispose();
                 await writer.WriteAsync(ErrorFile(scanId, root, directory, FileState.Unreadable, DescribeError(ex)) with { IsDirectory = true }, ct).ConfigureAwait(false);
             }
         }
@@ -283,7 +302,9 @@ public sealed class Scanner(FileGuardStore store, GuardSettings settings)
                 catch (Exception ex) when (IsFileException(ex)) { traversalError = ex; }
                 if (entry is null)
                 {
-                    frames.Pop().Entries.Dispose();
+                    frames.Pop();
+                    frame.Entries.Dispose();
+                    frame.Guard?.Dispose();
                     if (traversalError is not null)
                         await writer.WriteAsync(ErrorFile(scanId, root, frame.Path, FileState.Unreadable, DescribeError(traversalError)) with { IsDirectory = true }, ct).ConfigureAwait(false);
                     continue;
@@ -324,7 +345,14 @@ public sealed class Scanner(FileGuardStore store, GuardSettings settings)
                 if (record is not null) await writer.WriteAsync(record, ct).ConfigureAwait(false);
             }
         }
-        finally { while (frames.Count > 0) frames.Pop().Entries.Dispose(); }
+        finally
+        {
+            while (frames.TryPop(out var frame))
+            {
+                frame.Entries.Dispose();
+                frame.Guard?.Dispose();
+            }
+        }
     }
 
     private bool IsInternalPath(string path) => PathSafety.IsWithin(path, store.DataDirectory)

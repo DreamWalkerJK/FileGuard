@@ -58,6 +58,7 @@ nunit-*.xml
 
 # FileGuard private state and generated fixtures
 .test-data/
+.test-artifacts/
 .local/
 *.db
 *.db-shm

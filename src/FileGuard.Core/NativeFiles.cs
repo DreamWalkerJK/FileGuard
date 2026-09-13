@@ -31,6 +31,9 @@ internal static class NativeFiles
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetFileInformationByHandleEx(SafeFileHandle file, int infoClass, out FileIdInformation info, uint size);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandleEx(SafeFileHandle file, int infoClass, IntPtr info, uint size);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path, uint size, uint flags);
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -71,15 +74,39 @@ internal static class NativeFiles
         if (final.StartsWith("\\\\?\\", StringComparison.Ordinal)) final = final[4..];
         if (!string.Equals(Path.TrimEndingDirectorySeparator(final), Path.TrimEndingDirectorySeparator(Path.GetFullPath(expectedPath)), StringComparison.OrdinalIgnoreCase))
             throw new GuardException("文件句柄最终路径已变化。");
+        if (!directory) EnsureUnnamedStreamOnly(handle);
     }
     public static FileSnapshot Snapshot(SafeFileHandle handle)
     {
         if (!GetFileInformationByHandle(handle, out var info)) throw new IOException("不能读取文件身份。", new Win32Exception(Marshal.GetLastPInvokeError()));
-        if (!GetFileInformationByHandleEx(handle, 18, out FileIdInformation id, 24)) throw new GuardException("文件系统不提供可靠的 128 位文件身份，拒绝依赖不完整身份。");
+        var knownIdentity = GetFileInformationByHandleEx(handle, 18, out FileIdInformation id, 24);
         var length = checked((long)(((ulong)info.SizeHigh << 32) | info.SizeLow));
         var ticks = ((long)info.Write.dwHighDateTime << 32) | (uint)info.Write.dwLowDateTime;
-        return new(length, DateTime.FromFileTimeUtc(ticks), $"{id.Volume:x16}:{id.High:x16}{id.Low:x16}", info.Links,
+        return new(length, DateTime.FromFileTimeUtc(ticks), knownIdentity ? $"{id.Volume:x16}:{id.High:x16}{id.Low:x16}" : null, info.Links,
             (info.Attributes & ((uint)FileAttributes.SparseFile | (uint)FileAttributes.Compressed)) != 0);
+    }
+    private static void EnsureUnnamedStreamOnly(SafeFileHandle handle)
+    {
+        const int capacity = 65536;
+        var buffer = Marshal.AllocHGlobal(capacity);
+        try
+        {
+            if (!GetFileInformationByHandleEx(handle, 7, buffer, capacity)) throw new GuardException("无法核验命名数据流；首版保守拒绝该文件。");
+            var offset = 0;
+            while (true)
+            {
+                if (offset < 0 || offset > capacity - 24) throw new GuardException("文件数据流元数据无效。");
+                var next = Marshal.ReadInt32(buffer, offset);
+                var length = Marshal.ReadInt32(buffer, offset + 4);
+                if (length < 0 || (length & 1) != 0 || length > capacity - offset - 24) throw new GuardException("文件数据流名称无效。");
+                var name = Marshal.PtrToStringUni(buffer + offset + 24, length / 2);
+                if (name != "::$DATA") throw new GuardException("文件包含 NTFS 命名数据流；首版拒绝将其作为完整重复文件或清理目标。");
+                if (next == 0) return;
+                if (next < 24) throw new GuardException("文件数据流链无效。");
+                offset = checked(offset + next);
+            }
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
     }
     public static void Rename(SafeFileHandle handle, string destination)
     {
