@@ -1,0 +1,14 @@
+@inject WebWorkspace Workspace
+<p class="notice">SHA-256 清单验证内容一致性，不能证明清单来源真实性。只上传 JSON 清单；扫描的文件内容始终留在服务器。</p>
+<div class="manifest-grid"><section class="panel"><h2>创建清单</h2><p>读取允许根目录内的文件，下载可移植的 JSON 内容基线。</p><form method="post" action="/actions/manifests/create" class="stack" data-download="true"><AntiforgeryToken /><label>服务端根目录<RootSelect /></label><button>创建并下载 JSON</button></form></section>
+    <section class="panel"><h2>校验现有清单</h2><p>与服务器目录重新比较，区分变化、缺失、新增与读取错误。</p><form method="post" action="/actions/manifests/verify" enctype="multipart/form-data" class="stack" data-busy-label="正在校验文件…"><AntiforgeryToken /><label>服务端根目录<RootSelect /></label><label>基准清单（最多 8 MB）<input type="file" name="manifest" accept=".json,application/json" required /></label><button>校验并查看差异</button></form></section>
+</div>
+<section class="panel"><h2>比较两份清单</h2><p>只比较清单记录，不读取服务器文件。新版本相对于旧版本的变化会列在下方。</p><form method="post" action="/actions/manifests/diff" enctype="multipart/form-data" class="stack"><AntiforgeryToken /><div class="form-grid"><label>旧清单<input type="file" name="before" accept=".json,application/json" required /></label><label>新清单<input type="file" name="after" accept=".json,application/json" required /></label></div><div class="form-actions"><span class="hint">每份 JSON 清单不超过 8 MB，请勿上传文件内容。</span><button>比较清单</button></div></form></section>
+@if (Result is { } result)
+{
+    <section class="panel"><div class="section-head"><h2>差异结果 <span class="status @(result.HasDifferences ? "warning" : "success")">@(result.HasDifferences ? "检测到差异" : "内容一致")</span></h2><a href="/api/results/@ResultId" download="fileguard-differences.json">下载完整 JSON 结果</a></div>
+        <div class="table-wrap"><table><thead><tr><th>相对路径</th><th>差异类型</th><th>说明</th></tr></thead><tbody>@foreach (var difference in result.Differences.Skip(Ui.Offset(PageNumber)).Take(25)) { <tr><td class="path">@difference.Path</td><td><span class="status @Ui.Tone(difference.Kind.ToString())">@Ui.Label(difference.Kind)</span></td><td>@(difference.Detail ?? "—")</td></tr> }@if (result.Differences.Count == 0) { <tr><td colspan="3" class="empty">清单中没有文件差异条目。</td></tr> }</tbody></table></div><Pager Total="result.Differences.Count" PageNumber="PageNumber" BaseUrl="@($"/?tab=manifests&result={ResultId}")" /><p class="hint">结果页暂存最近 16 份结果，服务重启后清空。需要长期保存时请下载 JSON。</p>
+    </section>
+}
+else if (ResultId is not null) { <p class="notice">该结果已不在当前服务内存中。请重新校验或比较清单。</p> }
+@code { [Parameter] public string? ResultId { get; set; } [Parameter] public int PageNumber { get; set; } private ManifestResult? Result => ResultId is null ? null : Workspace.Result(ResultId); }

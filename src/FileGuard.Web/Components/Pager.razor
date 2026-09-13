@@ -1,0 +1,5 @@
+<nav class="pager" aria-label="分页"><span>共 @Total.ToString("N0") 项 · 第 @(Math.Max(0, PageNumber) + 1) 页</span><div>
+    @if (PageNumber > 0) { <a href="@(BaseUrl + "&page=" + (PageNumber - 1))" class="button secondary">上一页</a> }
+    @if ((long)Ui.Offset(PageNumber) + 25 < Total) { <a href="@(BaseUrl + "&page=" + (Math.Max(0, PageNumber) + 1))" class="button secondary">下一页</a> }
+</div></nav>
+@code { [Parameter] public long Total { get; set; } [Parameter] public int PageNumber { get; set; } [Parameter] public string BaseUrl { get; set; } = "/?tab=scans"; }

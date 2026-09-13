@@ -97,6 +97,11 @@ public sealed class ManifestService(Scanner scanner, FileGuardStore store)
     public static async Task<ManifestDocument> ReadAsync(string path, CancellationToken cancellationToken = default)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        return Parse(bytes);
+    }
+
+    public static ManifestDocument Parse(byte[] bytes)
+    {
         if (bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf })) throw new GuardException("清单必须使用无 BOM 的 UTF-8 编码。");
         try
         {

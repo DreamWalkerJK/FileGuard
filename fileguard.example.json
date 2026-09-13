@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "dataDirectory": "./.local/state",
+  "allowedRoots": ["./.local/sample-data"],
+  "quarantineDirectory": "./.local/quarantine",
+  "concurrency": 2,
+  "channelCapacity": 64,
+  "bytesPerSecond": 0,
+  "diagnosticPaths": false
+}

@@ -1,0 +1,70 @@
+@inject WebWorkspace Workspace
+<section class="panel">
+    <div class="section-head"><h2>新建扫描</h2><span>只读取文件，不移动或删除</span></div>
+    @if (Workspace.Settings.AllowedRoots.Length == 0) { <div class="empty"><h3>先添加一个允许根目录</h3><p>在服务端使用 <code>--allow-root</code> 指定测试目录后重启。根目录设置页可启用或停用已有目录。</p><a href="/?tab=settings">查看根目录设置</a></div> }
+    else
+    {
+        <form method="post" action="/actions/scans" class="stack" data-busy-label="正在创建扫描…">
+            <AntiforgeryToken />
+            <fieldset><legend>选择服务端根目录</legend><div class="root-grid">
+                @for (var index = 0; index < Workspace.Settings.AllowedRoots.Length; index++)
+                {
+                    if (Workspace.Enabled(index)) { <label class="root-option"><input name="roots" type="checkbox" value="@index" checked /><span class="folder-icon" aria-hidden="true">▰</span><span class="path">@Workspace.Settings.AllowedRoots[index]</span></label> }
+                }
+            </div></fieldset>
+            <details><summary>筛选与扫描选项</summary><div class="form-grid">
+                <label>包含模式<input name="include" placeholder="例如 **/*.txt；多个模式用分号分隔" /></label>
+                <label>排除模式<input name="exclude" placeholder="例如 **/node_modules/**" /></label>
+                <label>扩展名<input name="extensions" placeholder=".txt;.pdf" /></label>
+                <label>并发读取数<input name="concurrency" type="number" min="1" max="16" value="@Workspace.Settings.Concurrency" /></label>
+                <label>最小大小（字节）<input name="minSize" type="number" min="0" /></label><label>最大大小（字节）<input name="maxSize" type="number" min="0" /></label>
+                <label>修改时间起点<input name="modifiedAfter" type="datetime-local" /></label><label>修改时间终点<input name="modifiedBefore" type="datetime-local" /></label>
+            </div></details>
+            <div class="form-actions"><p class="hint">默认跳过符号链接、junction 和其他重解析点。</p><button type="submit">开始扫描</button></div>
+        </form>
+    }
+</section>
+@if (Selected is { } scan)
+{
+    <section class="panel" data-scan-id="@scan.Id" data-live="@(Ui.Active(scan.State) ? "true" : "false")">
+        <div class="section-head"><div><h2>扫描详情 <span class="status @Ui.Tone(scan.State.ToString())" data-live-state>@Ui.Label(scan.State)</span></h2><span class="id">@scan.Id</span></div><a href="/?tab=duplicates&scan=@scan.Id" class="button secondary">查看重复组</a></div>
+        <div class="metrics"><div><span>已发现文件</span><b data-live-files>@scan.FileCount.ToString("N0")</b></div><div><span>已读取</span><b data-live-bytes>@Ui.Bytes(scan.BytesRead)</b></div><div><span>读取错误</span><b data-live-errors>@scan.ErrorCount</b></div><div><span>完整哈希</span><b>@scan.HashCount.ToString("N0")</b></div></div>
+        @if (Ui.Active(scan.State)) { <div class="live-progress"><span></span></div><p class="hint" role="status" data-poll-status>扫描进行中，每 1.5 秒刷新进度。</p> }
+        @if (!string.IsNullOrWhiteSpace(scan.Error)) { <p class="notice danger">@scan.Error</p> }
+        @if (scan.State is ScanState.Cancelled or ScanState.Interrupted or ScanState.Failed or ScanState.PartialFailure) { <p class="notice">检查下方错误文件，关闭占用文件的程序或修复权限后重新扫描。中断任务保留记录，通过相同选项创建新任务，不能原地续扫。</p> }
+        <div class="inline-actions">
+            @if (Ui.Active(scan.State)) { <form method="post" action="@($"/actions/scans/{scan.Id}/cancel")"><AntiforgeryToken /><button class="secondary" type="submit">取消扫描</button></form> }
+            else { <form method="post" action="@($"/actions/scans/{scan.Id}/retry")"><AntiforgeryToken /><button class="secondary" type="submit">使用相同选项重新扫描</button></form> }
+        </div>
+        <form class="filter-bar" method="get"><input type="hidden" name="tab" value="scans" /><input type="hidden" name="scan" value="@scan.Id" /><label>文件状态<select name="state"><option value="">全部文件</option>@foreach (var state in Enum.GetValues<FileState>()) { <option value="@state" selected="@(StateFilter == state.ToString())">@Ui.Label(state)</option> }</select></label><button class="secondary">筛选文件</button></form>
+        @if (Files is { } files)
+        {
+            <div class="table-wrap"><table><thead><tr><th>相对路径</th><th>大小</th><th>状态</th><th>错误 / 建议</th></tr></thead><tbody>
+                @foreach (var file in files.Items) { <tr><td class="path">@file.RelativePath</td><td>@Ui.Bytes(file.Size)</td><td><span class="status @Ui.Tone(file.State.ToString())">@Ui.Label(file.State)</span></td><td>@(file.Error ?? "—")</td></tr> }
+                @if (files.Total == 0) { <tr><td colspan="4" class="empty">当前筛选没有文件。扫描期间文件索引会逐步写入。</td></tr> }
+            </tbody></table></div>
+            <Pager Total="files.Total" PageNumber="PageNumber" BaseUrl="@($"/?tab=scans&scan={scan.Id}&state={Uri.EscapeDataString(StateFilter ?? "")}")" />
+        }
+    </section>
+}
+<section class="panel"><div class="section-head"><h2>扫描任务</h2><span>@Scans.Total 个任务</span></div><div class="table-wrap"><table><thead><tr><th>任务 / 时间</th><th>文件</th><th>逻辑总大小</th><th>状态</th><th>操作</th></tr></thead><tbody>
+    @foreach (var entry in Scans.Items) { <tr><td><a class="id" href="/?tab=scans&scan=@entry.Id">@entry.Id[..8]</a><small>@Ui.Time(entry.CreatedUtc)</small></td><td>@entry.FileCount.ToString("N0")</td><td>@Ui.Bytes(entry.TotalBytes)</td><td><span class="status @Ui.Tone(entry.State.ToString())">@Ui.Label(entry.State)</span></td><td><a href="/?tab=duplicates&scan=@entry.Id">查看重复组</a></td></tr> }
+    @if (Scans.Total == 0) { <tr><td colspan="5" class="empty">还没有扫描记录。选择允许目录并开始扫描。</td></tr> }
+</tbody></table></div>@if (Selected is null) { <Pager Total="Scans.Total" PageNumber="PageNumber" BaseUrl="/?tab=scans" /> }</section>
+@code {
+    [Parameter] public string? ScanId { get; set; }
+    [Parameter] public int PageNumber { get; set; }
+    [Parameter] public string? StateFilter { get; set; }
+    private ScanRecord? Selected;
+    private Page<FileRecord>? Files;
+    private Page<ScanRecord> Scans = new([], 0, 0, 25);
+    protected override void OnParametersSet()
+    {
+        Scans = Workspace.Store.ListScans(ScanId is null ? Ui.Offset(PageNumber) : 0, 25);
+        if (ScanId is not null)
+        {
+            Selected = Workspace.Store.GetScan(ScanId);
+            Files = Workspace.Store.GetFiles(ScanId, Ui.Offset(PageNumber), 25, Enum.TryParse<FileState>(StateFilter, out var state) ? state : null);
+        }
+    }
+}

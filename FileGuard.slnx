@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/FileGuard.Benchmarks/FileGuard.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/FileGuard.Cli/FileGuard.Cli.csproj" />
     <Project Path="src/FileGuard.Core/FileGuard.Core.csproj" />

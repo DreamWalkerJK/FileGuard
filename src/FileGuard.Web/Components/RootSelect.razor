@@ -1,0 +1,2 @@
+@inject WebWorkspace Workspace
+<select name="root" required>@for (var index = 0; index < Workspace.Settings.AllowedRoots.Length; index++) { if (Workspace.Enabled(index)) { <option value="@index">@Workspace.Settings.AllowedRoots[index]</option> } }</select>

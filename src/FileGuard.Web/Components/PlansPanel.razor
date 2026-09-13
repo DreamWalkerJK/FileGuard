@@ -1,0 +1,27 @@
+@inject WebWorkspace Workspace
+@if (Selected is { } plan)
+{
+    <section class="panel"><div class="section-head"><div><h2>清理计划预览</h2><span class="id">@plan.Id</span></div><span class="status @(plan.ExpiresUtc < DateTimeOffset.UtcNow ? "error" : "neutral")">@(plan.ExpiresUtc < DateTimeOffset.UtcNow ? "计划已过期" : "等待明确执行")</span></div>
+        <div class="workflow" aria-label="清理流程"><span>已扫描</span><span>已选保留规则</span><strong>审查计划</strong><span>可恢复隔离</span><span>恢复 / 永久清除</span></div>
+        <div class="metrics"><div><span>候选文件</span><b>@plan.Operations.Count</b></div><div><span>逻辑候选大小</span><b>@Ui.Bytes(plan.LogicalBytes)</b></div><div><span>预计物理可回收</span><b>@Ui.Bytes(plan.EstimatedReclaimableBytes)</b></div><div><span>保留规则</span><b class="metric-text">@Ui.Label(plan.Options.Rule)</b></div></div>
+        <p class="notice">@plan.CapacityNote 计划到期时间：@Ui.Time(plan.ExpiresUtc)。隔离本身不会释放同卷空间。</p>
+        <div class="table-wrap"><table><thead><tr><th>移入隔离区的候选文件</th><th>保留文件</th><th>逻辑大小</th><th>实际状态</th></tr></thead><tbody>
+            @foreach (var operation in plan.Operations.Skip(Ui.Offset(PageNumber)).Take(25)) { <tr><td class="path">@operation.Candidate.FullPath</td><td class="path keeper">@operation.Keeper.FullPath</td><td>@Ui.Bytes(operation.Candidate.Size)</td><td><span class="status @Ui.Tone(operation.State.ToString())">@Ui.Label(operation.State)</span><small>@operation.Detail</small></td></tr> }
+            @if (plan.Operations.Count == 0) { <tr><td colspan="4" class="empty">这份计划没有可隔离的独立副本。</td></tr> }
+        </tbody></table></div><Pager Total="plan.Operations.Count" PageNumber="PageNumber" BaseUrl="@($"/?tab=plans&plan={plan.Id}")" />
+        <form method="post" action="@($"/actions/plans/{plan.Id}/apply")" class="confirmation" data-busy-label="正在重新验证并隔离…"><AntiforgeryToken />
+            <h3>确认将 @plan.Operations.Count 个候选文件移入隔离区</h3><p>执行会重新检查身份、边界和保留副本。文件变化或计划过期时会明确拒绝或跳过。</p>
+            <label>输入完整计划 ID 确认<input name="confirm" required autocomplete="off" spellcheck="false" placeholder="@plan.Id" /></label>
+            <button type="submit" disabled="@(plan.Operations.Count == 0 || plan.ExpiresUtc < DateTimeOffset.UtcNow)">确认执行隔离</button>
+        </form>
+    </section>
+}
+<section class="panel"><div class="section-head"><h2>已保存计划</h2><a href="/?tab=duplicates">从重复组生成计划</a></div><div class="table-wrap"><table><thead><tr><th>计划 ID / 创建时间</th><th>候选文件</th><th>逻辑大小</th><th>到期时间</th><th>操作</th></tr></thead><tbody>
+    @foreach (var entry in Plans.Items) { <tr><td><span class="id">@entry.Id[..8]</span><small>@Ui.Time(entry.CreatedUtc)</small></td><td>@entry.Operations.Count</td><td>@Ui.Bytes(entry.LogicalBytes)</td><td>@Ui.Time(entry.ExpiresUtc)</td><td><a href="/?tab=plans&plan=@entry.Id">预览计划</a></td></tr> }
+    @if (Plans.Total == 0) { <tr><td colspan="5" class="empty">还没有清理计划。先扫描目录，再从重复组选择保留规则。</td></tr> }
+</tbody></table></div>@if (Selected is null) { <Pager Total="Plans.Total" PageNumber="PageNumber" BaseUrl="/?tab=plans" /> }</section>
+@code {
+    [Parameter] public string? PlanId { get; set; } [Parameter] public int PageNumber { get; set; }
+    private CleanupPlan? Selected; private Page<CleanupPlan> Plans = new([], 0, 0, 25);
+    protected override void OnParametersSet() { Plans = Workspace.Store.ListPlans(PlanId is null ? Ui.Offset(PageNumber) : 0, 25); if (PlanId is not null) Selected = Workspace.Store.GetPlan(PlanId); }
+}

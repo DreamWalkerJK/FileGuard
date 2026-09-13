@@ -1,0 +1,23 @@
+@inject WebWorkspace Workspace
+<section class="panel"><div class="section-head"><div><h2>隔离操作记录</h2><span>共 @Operations.Total 个操作</span></div><a href="#recovery-preview" class="button secondary">预览中断恢复</a></div>
+    <p class="notice">隔离文件仍占用空间。恢复时不会覆盖同名文件；发生冲突后请先处理原位置的文件，再重新恢复。</p>
+    @foreach (var operation in Operations.Items)
+    {
+        <details class="operation" open><summary><span class="path">@operation.Candidate.RelativePath</span><span class="status @Ui.Tone(operation.State.ToString())">@Ui.Label(operation.State)</span></summary>
+            <dl class="operation-info"><dt>操作 ID</dt><dd class="id">@operation.Id</dd><dt>原位置</dt><dd class="path">@operation.Candidate.FullPath</dd><dt>隔离位置</dt><dd class="path">@operation.QuarantinePath</dd><dt>保留副本</dt><dd class="path">@operation.Keeper.FullPath</dd><dt>处理结果</dt><dd>@(operation.Detail ?? "等待执行")</dd><dt>安全检查</dt><dd>@(operation.SafetyCheck ?? "尚未执行")</dd><dt>实际释放记录</dt><dd>@Ui.Bytes(operation.ActualReclaimedBytes)（硬链接、压缩和稀疏文件可能无法精确计量）</dd></dl>
+            @if (operation.State is OperationState.Completed)
+            {
+                <div class="action-grid"><form method="post" action="@($"/actions/quarantine/{operation.Id}/restore")" class="stack"><AntiforgeryToken /><h3>恢复到原位置</h3><label>输入操作 ID 确认<input name="confirm" required placeholder="@operation.Id" autocomplete="off" /></label><button type="submit" class="secondary">恢复文件</button></form>
+                    <details class="danger-zone"><summary>永久清除此隔离文件</summary><form method="post" action="@($"/actions/quarantine/{operation.Id}/purge")" class="stack"><AntiforgeryToken /><p>永久清除后无法通过 FileGuard 恢复。此操作只处理指定的隔离文件。</p><label>输入操作 ID<input name="confirm" required placeholder="@operation.Id" autocomplete="off" /></label><label>第二次确认：输入 PERMANENT<input name="permanent" required pattern="PERMANENT" autocomplete="off" /></label><button class="danger-button" type="submit">确认永久清除</button></form></details>
+                </div>
+            }
+        </details>
+    }
+    @if (Operations.Total == 0) { <div class="empty"><h3>还没有隔离记录</h3><p>执行已审查的清理计划后，每个文件的处理结果会保存在这里。</p><a href="/?tab=plans">查看清理计划</a></div> }
+    <Pager Total="Operations.Total" PageNumber="PageNumber" BaseUrl="/?tab=quarantine" />
+</section>
+<section id="recovery-preview" class="panel"><h2>中断恢复预览</h2><p>执行会重新验证隔离文件、原文件身份与内容，然后提交已完成操作，或删除经过验证且由本操作创建的多余部分副本。无法证明安全的文件会保留，并标记需要人工核对。</p>
+    <div class="table-wrap"><table><thead><tr><th>待核对操作</th><th>原路径</th><th>状态</th></tr></thead><tbody>@foreach (var pending in Pending.Skip(Ui.Offset(PageNumber)).Take(25)) { <tr><td class="id">@pending.Id</td><td class="path">@pending.Candidate.FullPath</td><td>@Ui.Label(pending.State)</td></tr> }@if (Pending.Count == 0) { <tr><td colspan="3" class="empty">没有需要处理的中断操作。</td></tr> }</tbody></table></div><Pager Total="Pending.Count" PageNumber="PageNumber" BaseUrl="/?tab=quarantine" />
+    <form method="post" action="/actions/recover" class="confirmation"><AntiforgeryToken /><label>输入 RECOVER 确认处理当前 @Pending.Count 个中断操作<input name="confirm" required pattern="RECOVER" autocomplete="off" /></label><button disabled="@(Pending.Count == 0)">确认执行中断恢复</button></form>
+</section>
+@code { [Parameter] public int PageNumber { get; set; } private Page<CleanupOperation> Operations = new([], 0, 0, 25); private List<CleanupOperation> Pending = []; protected override void OnParametersSet() { Operations = Workspace.Store.ListOperations(Ui.Offset(PageNumber), 25); Pending = Workspace.RecoveryCandidates().ToList(); } }

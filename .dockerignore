@@ -1,0 +1,11 @@
+**/bin
+**/obj
+.git
+.local
+.test-data
+artifacts
+TestResults
+*.db
+*.db-shm
+*.db-wal
+*.lock

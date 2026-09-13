@@ -1,0 +1,39 @@
+@inject WebWorkspace Workspace
+<section class="panel"><form class="filter-bar" method="get"><input type="hidden" name="tab" value="duplicates" /><label>扫描任务<select name="scan" required><option value="">选择一次扫描</option>@foreach (var scan in Scans.Items) { <option value="@scan.Id" selected="@(scan.Id == ScanId)">@Ui.Time(scan.CreatedUtc) / @scan.Id[..8] / @Ui.Label(scan.State)</option> }</select></label><label>路径筛选<input name="search" value="@Search" placeholder="输入文件名或路径片段" /></label><button type="submit" class="secondary">查看重复组</button></form><p class="hint">这里列出最近 200 次扫描；更早的任务可从目录扫描分页进入。路径筛选只影响显示，清理计划覆盖本次扫描的所有重复组。</p></section>
+@if (ScanId is null) { <section class="panel empty"><h2>选择一份文件索引</h2><p>扫描完成后，具有相同大小和完整 SHA-256 的文件会出现在这里。硬链接会单独说明。</p><a href="/?tab=scans" class="button">前往目录扫描</a></section> }
+else
+{
+    <section class="panel"><div class="section-head"><h2>重复组</h2><span>@Filtered.Count 组匹配</span></div>
+        <p class="notice">相同摘要是重复候选依据。实际隔离前还会重新检查身份和内容，并与保留文件逐字节比较。</p>
+        @foreach (var group in Filtered.Skip(Ui.Offset(PageNumber)).Take(25))
+        {
+            <details class="duplicate-group" open>
+                <summary><span>@group.Files.Count 份相同内容 <b>@Ui.Bytes(group.Size) / 文件</b></span><span>预计可回收 @Ui.Bytes(group.EstimatedReclaimableBytes)</span></summary>
+                <p class="hash">SHA-256 @group.Sha256</p><p class="hint">@group.CapacityNote</p>
+                <div class="table-wrap"><table><thead><tr><th>文件路径</th><th>修改时间</th><th>物理文件身份</th></tr></thead><tbody>@foreach (var file in group.Files) { <tr><td class="path">@file.FullPath</td><td>@Ui.Time(file.ModifiedUtc)</td><td class="id">@(file.Identity ?? "平台未能可靠识别")<small>硬链接数：@(file.LinkCount?.ToString() ?? "未知")</small></td></tr> }</tbody></table></div>
+            </details>
+        }
+        @if (Filtered.Count == 0) { <div class="empty"><h3>没有匹配的重复组</h3><p>调整路径筛选，或确认扫描已经完成且没有读取错误。</p></div> }
+        <Pager Total="Filtered.Count" PageNumber="PageNumber" BaseUrl="@($"/?tab=duplicates&scan={ScanId}&search={Uri.EscapeDataString(Search ?? "")}")" />
+    </section>
+    <section class="panel"><div class="section-head"><h2>选择保留规则</h2><span>生成计划仅做预览</span></div>
+        <form method="post" action="/actions/plans" class="stack"><AntiforgeryToken /><input type="hidden" name="scan" value="@ScanId" />
+            <div class="form-grid"><label>保留规则<select name="rule">@foreach (var rule in Enum.GetValues<KeepRule>()) { <option value="@rule">@Ui.Label(rule)</option> }</select></label><label>首选目录<input name="preferredDirectory" placeholder="使用首选目录规则时填写服务端完整目录" /></label></div>
+            <label>显式保留路径<textarea name="keepPaths" rows="4" placeholder="显式选择规则：每个重复组至少填写一个需要保留的完整路径，每行一个。"></textarea></label>
+            <p class="hint">显式保留支持多个文件。每个组都会留下一份经过验证的可读副本。计划有效期 24 小时，下一步可逐项核对。</p>
+            <div class="form-actions"><span>逻辑重复大小：@Ui.Bytes(Groups.Sum(x => x.LogicalDuplicateBytes))</span><button type="submit" disabled="@(Groups.Count == 0)">生成并预览清理计划</button></div>
+        </form>
+    </section>
+}
+@code {
+    [Parameter] public string? ScanId { get; set; } [Parameter] public string? Search { get; set; } [Parameter] public int PageNumber { get; set; }
+    private Page<ScanRecord> Scans = new([], 0, 0, 200);
+    private IReadOnlyList<DuplicateGroup> Groups = [];
+    private List<DuplicateGroup> Filtered = [];
+    protected override void OnParametersSet()
+    {
+        Scans = Workspace.Store.ListScans(0, 200);
+        if (!string.IsNullOrWhiteSpace(ScanId)) Groups = Workspace.Duplicates(ScanId);
+        Filtered = Groups.Where(g => string.IsNullOrWhiteSpace(Search) || g.Files.Any(f => f.FullPath.Contains(Search, StringComparison.OrdinalIgnoreCase))).ToList();
+    }
+}

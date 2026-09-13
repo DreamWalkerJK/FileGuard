@@ -64,6 +64,10 @@ CLI 与 Web 可以连接同一个数据库。修改文件的互斥必须通过�
 
 普通应用日志使用任务 ID、相对路径或错误类别，避免泄露完整本地绝对路径。用户主动打开本地诊断模式后，诊断记录仍只保留在本机且不得提交到仓库。
 
+## CLI 与 Web 配置转发
+
+`fileguard serve` 是受控的 Web 进程启动器。它验证 URL 必须是 loopback HTTP，然后转发 `--config`、数据目录、允许根、隔离目录、并发、Channel 容量、IO 预算和诊断开关到 Web；不会转发任意未知参数。默认寻找与 CLI 相邻的 Web 可执行文件，也接受显式 `--web-path`。Web startup token 写入 `<data>/web-private/startup-token.txt`，CLI 不读取、不打印 token。服务输出流直接转发到调用端 stderr/stdout，Ctrl+C 先等待有序退出再在 5 秒后终止进程树。
+
 ## 验收与交付策略
 
 每个里程碑先构建、执行适用测试与手工验证，再审查 diff 和暂存内容，按提交规范创建本地提交并记录远程推送结果。测试数据、SQLite 文件、日志、发布产物与凭据不得加入源码提交。所有异常路径均使用生成数据验证。需求覆盖按 [requirements.md](requirements.md) 的编号记录，未验证平台能力不得描述为已保证。

@@ -1,0 +1,16 @@
+@page "/login"
+<main class="login">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">F</span> FileGuard</div>
+    <div class="login-art" aria-hidden="true"><div></div><div></div><div><span>SHA-256</span><b>本地文件保险柜</b></div></div>
+    <h1>连接你的文件工作区</h1>
+    <p>FileGuard 管理这台服务器上的文件。浏览器所在设备的磁盘不会自动被扫描。</p>
+    @if (Failed) { <p class="notice danger" role="alert">启动凭据无效或已经使用。请重启服务获取新凭据。</p> }
+    <form method="post" action="/auth/login" class="stack">
+        <AntiforgeryToken />
+        <label>一次性启动凭据<input name="token" type="password" required maxlength="64" minlength="64" autocomplete="off" spellcheck="false" autofocus /></label>
+        <p class="hint">在服务端配置的数据目录中打开 <code>web-private/startup-token.txt</code>，粘贴其中的凭据。登录成功后凭据文件会被删除。</p>
+        <button type="submit">打开工作区</button>
+    </form>
+    <p class="hint">会话有效期 8 小时。退出或过期后，重启服务生成新凭据。</p>
+</main>
+@code { [SupplyParameterFromQuery(Name = "failed")] public bool Failed { get; set; } }

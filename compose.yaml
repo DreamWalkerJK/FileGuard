@@ -1,0 +1,27 @@
+services:
+  scan:
+    build: .
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: bind
+        source: ./.local/sample-data
+        target: /data
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: fileguard-state
+        target: /state
+      - type: volume
+        source: fileguard-quarantine
+        target: /quarantine
+    command: ["scan", "/data", "--allow-root", "/data", "--data", "/state", "--quarantine", "/quarantine", "--json"]
+volumes:
+  fileguard-state:
+  fileguard-quarantine:

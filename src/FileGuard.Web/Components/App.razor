@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FileGuard · 本地文件管理</title>
+    <link rel="stylesheet" href="/assets/workspace.css" />
+    <HeadOutlet />
+</head>
+<body>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData"><RouteView RouteData="routeData" /></Found>
+        <NotFound><main class="login"><h1>找不到页面</h1><a href="/">返回文件工作区</a></main></NotFound>
+    </Router>
+    <script src="/assets/workspace.js" defer></script>
+</body>
+</html>

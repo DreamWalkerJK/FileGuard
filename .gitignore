@@ -59,6 +59,8 @@ nunit-*.xml
 # FileGuard private state and generated fixtures
 .test-data/
 .test-artifacts/
+__pycache__/
+*.pyc
 .local/
 *.db
 *.db-shm

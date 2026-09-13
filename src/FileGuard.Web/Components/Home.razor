@@ -1,0 +1,47 @@
+@page "/"
+@inject WebWorkspace Workspace
+<a href="#content" class="skip-link">跳到主要内容</a>
+<div class="shell">
+    <aside class="sidebar">
+        <a href="/" class="brand"><span class="brand-mark" aria-hidden="true">F</span> FileGuard</a>
+        <div class="workspace-label"><span class="local-dot"></span> 本机工作区</div>
+        <nav aria-label="主要导航">
+            @foreach (var item in Navigation)
+            {
+                <a href="/?tab=@item.Key" class="@(CurrentTab == item.Key ? "selected" : "")" aria-current="@(CurrentTab == item.Key ? "page" : null)"><span aria-hidden="true">@item.Icon</span>@item.Label</a>
+            }
+        </nav>
+        <div class="sidebar-bottom"><p>文件留在本机<br />先审查，再执行</p><form method="post" action="/auth/logout"><AntiforgeryToken /><button class="quiet" type="submit">退出工作区</button></form></div>
+    </aside>
+    <main id="content" class="main">
+        <header class="topbar"><span>文件完整性与可恢复清理</span><span class="connection"><span class="local-dot"></span> localhost · 受保护会话</span></header>
+        <div class="page-head"><div><h1>@Title</h1><p>@Subtitle</p></div><div class="badge">服务端文件系统</div></div>
+        @if (!string.IsNullOrWhiteSpace(Notice)) { <p class="notice" role="status">@Notice</p> }
+        @if (CurrentTab == "scans") { <ScansPanel ScanId="@Scan" PageNumber="PageNumber" StateFilter="@State" /> }
+        else if (CurrentTab == "duplicates") { <DuplicatesPanel ScanId="@Scan" PageNumber="PageNumber" Search="@Search" /> }
+        else if (CurrentTab == "plans") { <PlansPanel PlanId="@Plan" PageNumber="PageNumber" /> }
+        else if (CurrentTab == "quarantine") { <QuarantinePanel PageNumber="PageNumber" /> }
+        else if (CurrentTab == "manifests") { <ManifestsPanel ResultId="@Result" PageNumber="PageNumber" /> }
+        else if (CurrentTab == "history") { <HistoryPanel PageNumber="PageNumber" /> }
+        else if (CurrentTab == "settings") { <SettingsPanel /> }
+        <footer>扫描不是原子快照。隔离前将重新验证文件与保留副本，永久清除需要独立确认。</footer>
+    </main>
+</div>
+@code {
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+    [SupplyParameterFromQuery(Name = "scan")] public string? Scan { get; set; }
+    [SupplyParameterFromQuery(Name = "plan")] public string? Plan { get; set; }
+    [SupplyParameterFromQuery(Name = "result")] public string? Result { get; set; }
+    [SupplyParameterFromQuery(Name = "notice")] public string? Notice { get; set; }
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+    [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int PageNumber { get; set; }
+    private static readonly (string Key, string Label, string Icon, string Subtitle)[] Navigation = [
+        ("scans", "目录扫描", "⌕", "建立文件索引，查看进度与读取错误。"), ("duplicates", "重复文件", "▤", "比较完整 SHA-256，选择需要保留的文件。"),
+        ("plans", "清理计划", "☷", "逐项审查候选与保留副本，再移入可恢复隔离区。"), ("quarantine", "隔离与恢复", "▣", "核对实际操作状态，恢复文件或独立永久清除。"),
+        ("manifests", "完整性清单", "✓", "建立内容基线，检查变化、缺失与无法读取的文件。"), ("history", "操作历史", "◷", "查看持久化操作记录与每次操作的安全检查。"),
+        ("settings", "根目录与设置", "⚙", "在服务启动时指定的范围内管理可扫描目录。")];
+    private string CurrentTab => Navigation.Any(x => x.Key == Tab) ? Tab! : "scans";
+    private string Title => Navigation.First(x => x.Key == CurrentTab).Label;
+    private string Subtitle => Navigation.First(x => x.Key == CurrentTab).Subtitle;
+}

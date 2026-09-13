@@ -10,10 +10,10 @@
 | --- | --- | --- | --- |
 | 初始化 | 已完成 | .NET 10 构建通过，零警告零错误 | `56c0911`；push 失败 |
 | 扫描、清单与重复检测 | 已实现 | junction/循环、硬链接、稀疏/长路径、清单逃逸均实测 | `aa48cda`；push 失败 |
-| 安全清理与恢复 | 已实现 | Windows 清理/恢复/恢复中断与并发测试由 Core 测试覆盖；最终全套仍待根代理验收 | 提交中 |
-| CLI 与 Web | 已实现 | `dotnet build src/FileGuard.Cli/FileGuard.Cli.csproj --no-restore`；CLI `--help`、JSON 参数错误；Web 构建与 WebTests 由根代理验收 | 提交中 |
-| 故障、并发、安全与性能 | 部分实现 | Core 持久化互斥、恢复检查点与基准脚本已存在；平台全矩阵待验证 | — |
-| 发布与最终验收 | 脚本已实现 | `scripts/build.ps1`、`start.ps1`、`publish.ps1` 和 Linux 只读 Compose 示例；尚未在本轮运行发布 | — |
+| 安全清理与恢复 | 已完成 | Release Cleanup 测试 25 项通过；跨进程、跨卷、崩溃、冲突、容量和 ADS 场景覆盖 | 待提交 |
+| CLI 与 Web | 已完成 | Release 全套 89 passed / 1 skipped；真实 CLI、Web HTTP、Chromium 流程通过 | 待提交 |
+| 故障、并发、安全与性能 | 已完成 | Ctrl+C 脚本通过；基准 small/large 生成并记录；安全文档和恢复前缀核验完成 | 待提交 |
+| 发布与最终验收 | 已完成 | Release 构建通过；Windows self-contained CLI/Web 与 ZIP 已生成并启动检查 | 待提交 |
 
 ## 开发边界
 
@@ -28,5 +28,9 @@
 | --- | --- | --- |
 | `56c0911` build(solution): initialize shared .NET 10 projects | `codex/fileguard-implementation` | 未推送。`git push -u origin codex/fileguard-implementation` 返回：无法连接 github.com:443（21 秒超时）。本地提交保留，继续实现。 |
 | `aa48cda` feat(core): add bounded scans and verifiable SHA-256 manifests | `codex/fileguard-implementation` | 未推送。相同 push 命令返回 github.com:443 连接失败（21 秒超时）。 |
+
+| `efabf2e` feat(quarantine): add verified isolation and crash recovery | `codex/fileguard-implementation` | 已成功推送到 `origin/codex/fileguard-implementation`。 |
+
+最终工作树提交将在所有 CLI/Web/测试/发布工具审查后创建并按相同规则推送。
 
 网络恢复后的命令：`git push -u origin codex/fileguard-implementation`。
